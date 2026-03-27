@@ -1,11 +1,3 @@
-from rest_framework.permissions import BasePermission
+from task_api.permissions import IsManager
 
-
-class IsManager(BasePermission):
-    """
-    Allow access only to manager users.
-    """
-    def has_permission(self, request, view):
-        if request.user.is_staff:
-            return True
-        return request.user.groups.filter(name='Manager').exists()
+__all__ = ['IsManager']

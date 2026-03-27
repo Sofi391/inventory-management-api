@@ -4,6 +4,7 @@ from rest_framework.generics import ListAPIView, CreateAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from .permissions import IsManagerOrReadOnly,IsManager,IsManagerOrOwner,IsManagerOrTransactionOwner
+from .permissions import MANAGER_GROUP, _is_manager
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.core.mail import send_mail
@@ -136,7 +137,7 @@ class SaleViewSet(ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        if self.request.user.is_staff or self.request.user.groups.filter(name='Manager').exists():
+        if self.request.user.is_staff or self.request.user.groups.filter(name=MANAGER_GROUP).exists():
             queryset = Sale.objects.all()
         else:
             queryset = queryset.filter(sold_by=self.request.user)
@@ -193,7 +194,7 @@ class StockTransactionListView(ListAPIView):
     def get_queryset(self):
         queryset = super().get_queryset()
         user = self.request.user
-        if user.is_staff or user.groups.filter(name='Manager').exists():
+        if user.is_staff or user.groups.filter(name=MANAGER_GROUP).exists():
             queryset = queryset
         else:
             queryset = queryset.filter(created_by=self.request.user)

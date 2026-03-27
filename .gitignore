@@ -13,6 +13,7 @@ dist/
 .eggs/
 
 # Django
+logs/
 *.log
 *.pot
 *.pyc

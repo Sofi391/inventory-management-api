@@ -136,7 +136,7 @@ The API is fully documented via Postman, covering:
 
 ```bash
 git clone https://github.com/Sofi391/Task_management_api_capstone.git
-cd task_management_capstone
+cd alx_capstone
 
 python -m venv venv
 # Windows

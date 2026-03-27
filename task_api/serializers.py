@@ -50,20 +50,6 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         product = validated_data['product']
         return PurchaseOrder.objects.create(unit_price=product.buying_price,**validated_data)
 
-    # def validate_status(self, value):
-    #     if self.instance:
-    #         purchase = self.instance
-    #         if purchase.status != 'Pending':
-    #             raise serializers.ValidationError(f"This product purchase is already {purchase.status}.")
-    #         if value not in ['Completed','Pending']:
-    #             raise serializers.ValidationError("Status must only be Completed or Pending.")
-    #
-    # def update(self, instance, validated_data):
-    #     new_status = validated_data['status']
-    #     instance.status = new_status
-    #     super().update(instance, validated_data)
-    #     return instance
-
 
 class SaleSerializer(serializers.ModelSerializer):
     product = serializers.SlugRelatedField(slug_field='slug',queryset=Product.objects.all())

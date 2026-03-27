@@ -1,3 +1,5 @@
+import logging
+import time
 from rest_framework.generics import ListAPIView, CreateAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -8,14 +10,16 @@ from django.core.mail import send_mail
 from django.conf import settings
 from rest_framework.viewsets import ModelViewSet
 from rest_framework import filters, status
-from .models import Product, Supplier, PurchaseOrder, StockTransaction,Sale
+from .models import Product, Supplier, PurchaseOrder, StockTransaction,Sale,User
 from .serializers import (ProductSerializer, SupplierSerializer,
                           PurchaseOrderSerializer,StockTransactionSerializer,
                           SaleSerializer,StockTransactionCreateSerializer,
                           )
 
+logger = logging.getLogger('task_api')
 
-def low_stock_alert(product):
+
+def low_stock_alert(product, recipients):
     subject = f"Low Stock Alert: {product.name}"
     message = f"""
 Hello,
@@ -41,11 +45,11 @@ You can review the product and take action from the inventory management system.
 If this message was sent in error, please ignore it.
 
 Best regards,
-Inventory Management System
+The Inventory Management Team
     """
     from_email = f"Inventory Management System<{settings.EMAIL_HOST_USER}>"
-    recipient_list = ['sofi123man@gmail.com']
-    send_mail(subject, message, from_email, recipient_list, fail_silently=False)
+    send_mail(subject, message, from_email, recipients, fail_silently=False)
+    logger.info("Low stock alert sent | product=%s | stock=%s | recipients=%s", product.name, product.current_stock, recipients)
 
 
 class SupplierViewSet(ModelViewSet):
@@ -98,27 +102,27 @@ class PurchaseViewSet(ModelViewSet):
 
     @action(detail=True,methods=['post'],permission_classes=[IsAuthenticated,IsManager])
     def complete(self, request, pk=None):
+        start = time.time()
         purchase = self.get_object()
+        logger.info("Purchase complete attempt | purchase_id=%s | user=%s", pk, request.user)
         if purchase.status != 'Pending':
+            logger.warning("Purchase already %s | purchase_id=%s", purchase.status, pk)
             return Response(
-            {"detail": f"Purchase is already {purchase.status}."},
+                {"detail": f"Purchase is already {purchase.status}."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         purchase.status = "Completed"
         purchase.save()
-
         StockTransaction.objects.create(
-            transaction_type = 'IN',
-            quantity = purchase.quantity,
-            unit_price = purchase.unit_price,
-            product = purchase.product,
-            created_by = self.request.user,
-            note = f"Purchase Completed with id:{purchase.id}"
+            transaction_type='IN',
+            quantity=purchase.quantity,
+            unit_price=purchase.unit_price,
+            product=purchase.product,
+            created_by=self.request.user,
+            note=f"Purchase Completed with id:{purchase.id}"
         )
-
-        return Response({
-            'detail':'Purchase Completed!'
-        })
+        logger.info("Purchase completed | purchase_id=%s | product=%s | qty=%s | elapsed=%.3fs", pk, purchase.product.name, purchase.quantity, time.time() - start)
+        return Response({'detail': 'Purchase Completed!'})
 
 
 class SaleViewSet(ModelViewSet):
@@ -144,29 +148,35 @@ class SaleViewSet(ModelViewSet):
 
     @action(detail=True,methods=['post'])
     def complete(self, request, pk=None):
+        start = time.time()
         sales = self.get_object()
+        logger.info("Sale complete attempt | sale_id=%s | user=%s", pk, request.user)
         if sales.status != 'Pending':
+            logger.warning("Sale already %s | sale_id=%s", sales.status, pk)
             return Response(
-            {"detail": f"Sales is already {sales.status}."},
+                {"detail": f"Sales is already {sales.status}."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         sales.status = "Completed"
         sales.save()
-
         StockTransaction.objects.create(
-            transaction_type = 'OUT',
-            quantity = sales.quantity,
-            unit_price = sales.selling_price,
-            product = sales.product,
-            created_by = self.request.user,
-            note = f"Sales Completed with id:{sales.id}"
+            transaction_type='OUT',
+            quantity=sales.quantity,
+            unit_price=sales.selling_price,
+            product=sales.product,
+            created_by=self.request.user,
+            note=f"Sales Completed with id:{sales.id}"
         )
-        if sales.product.current_stock<=sales.product.reorder_level:
-            low_stock_alert(sales.product)
-
-        return Response({
-            'detail':'Sales Completed!'
-        })
+        logger.info("Sale completed | sale_id=%s | product=%s | qty=%s | elapsed=%.3fs", pk, sales.product.name, sales.quantity, time.time() - start)
+        if sales.product.current_stock <= sales.product.reorder_level:
+            recipients = list(User.objects.filter(is_staff=True).values_list('email', flat=True))
+            managers = list(User.objects.filter(groups__name='Manager').values_list('email', flat=True))
+            recipients = list(set(recipients + managers))
+            try:
+                low_stock_alert(sales.product, recipients)
+            except Exception as e:
+                logger.error("Failed to send low stock alert | product=%s | error=%s", sales.product.name, e)
+        return Response({'detail': 'Sales Completed!'})
 
 
 class StockTransactionListView(ListAPIView):
@@ -199,7 +209,16 @@ class StockTransactionCreate(CreateAPIView):
     permission_classes = [IsAuthenticated,IsManager]
 
     def perform_create(self, serializer):
+        start = time.time()
         transaction = serializer.save(created_by=self.request.user)
+        logger.info("Stock transaction created | type=%s | product=%s | qty=%s | user=%s | elapsed=%.3fs",
+                    transaction.transaction_type, transaction.product.name, transaction.quantity, self.request.user, time.time() - start)
         if transaction.product.current_stock <= transaction.product.reorder_level:
-            low_stock_alert(transaction.product)
+            recipients = list(User.objects.filter(is_staff=True).values_list('email', flat=True))
+            managers = list(User.objects.filter(groups__name='Manager').values_list('email', flat=True))
+            recipients = list(set(recipients + managers))
+            try:
+                low_stock_alert(transaction.product, recipients)
+            except Exception as e:
+                logger.error("Failed to send low stock alert | product=%s | error=%s", transaction.product.name, e)
         return transaction

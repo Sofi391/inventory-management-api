@@ -41,3 +41,9 @@ class IsManagerOrTransactionOwner(BasePermission):
     """
     def has_permission(self, request, view):
         return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.is_staff or request.user.groups.filter(name='Manager').exists():
+            return True
+        return request.user == obj.created_by
+

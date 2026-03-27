@@ -39,7 +39,7 @@ class Product(models.Model):
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
     current_stock = models.PositiveIntegerField(default=0)
     reorder_level = models.PositiveIntegerField(default=5)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     slug = models.SlugField(max_length=100, unique=True,blank=True)
 
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE,related_name='products',null=True,blank=True)
@@ -71,7 +71,7 @@ class StockTransaction(models.Model):
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     note = models.TextField(blank=True,null=True)
 
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created')
@@ -102,7 +102,7 @@ class PurchaseOrder(models.Model):
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(choices=choice,max_length=10,default='Pending')
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE,related_name='purchased')
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE,related_name='supplied')
@@ -119,7 +119,7 @@ class Sale(models.Model):
     quantity = models.PositiveIntegerField()
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(choices=choice,max_length=10,default='Pending')
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE,related_name='sold')
     sold_by = models.ForeignKey(User, on_delete=models.CASCADE,related_name='sold_by')

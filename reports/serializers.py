@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from task_api.models import Sale,Product,Supplier
+from task_api.models import Product,Supplier
 
 
 
@@ -23,7 +23,7 @@ class StockReportSummarySerializer(serializers.Serializer):
 
 class TopSellingReportSerializer(serializers.Serializer):
     product_name = serializers.CharField()
-    product_id = serializers.IntegerField()
+    prod_id = serializers.IntegerField()
     total_sells = serializers.IntegerField()
     total_revenue = serializers.FloatField()
     total_sells_transactions = serializers.IntegerField()
@@ -42,3 +42,4 @@ class SummaryTimelineSerializer(serializers.Serializer):
     total_sales = serializers.IntegerField()
     total_revenue = serializers.DecimalField(max_digits=15, decimal_places=2)
     total_sales_transactions = serializers.IntegerField()
+    total_profit = serializers.DecimalField(max_digits=15, decimal_places=2)

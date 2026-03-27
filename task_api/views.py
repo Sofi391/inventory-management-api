@@ -5,10 +5,13 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from .permissions import IsManagerOrReadOnly,IsManager,IsManagerOrOwner,IsManagerOrTransactionOwner
 from .permissions import MANAGER_GROUP, _is_manager
+from django.utils import timezone
+from datetime import datetime, time as dt_time, date
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import transaction
 from rest_framework.viewsets import ModelViewSet
 from rest_framework import filters, status
 from .models import Product, Supplier, PurchaseOrder, StockTransaction,Sale,User
@@ -54,7 +57,7 @@ The Inventory Management Team
 
 
 class SupplierViewSet(ModelViewSet):
-    queryset = Supplier.objects.all()
+    queryset = Supplier.objects.all().prefetch_related('products')
     serializer_class = SupplierSerializer
     lookup_field = 'slug'
     pagination_class = PageNumberPagination
@@ -67,14 +70,16 @@ class SupplierViewSet(ModelViewSet):
         from_date = self.request.query_params.get('from')
         to_date = self.request.query_params.get('to')
         if from_date:
-            queryset = queryset.filter(products__created_at__gte=from_date)
+            from_dt = timezone.make_aware(datetime.combine(date.fromisoformat(from_date), dt_time.min))
+            queryset = queryset.filter(products__created_at__gte=from_dt)
         if to_date:
-            queryset = queryset.filter(products__created_at__lte=to_date)
+            to_dt = timezone.make_aware(datetime.combine(date.fromisoformat(to_date), dt_time.max))
+            queryset = queryset.filter(products__created_at__lte=to_dt)
         return queryset.distinct()
 
 
 class ProductViewSet(ModelViewSet):
-    queryset = Product.objects.all()
+    queryset = Product.objects.all().select_related('supplier')
     serializer_class = ProductSerializer
     pagination_class = PageNumberPagination
     permission_classes = [IsAuthenticated,IsManagerOrReadOnly]
@@ -93,7 +98,7 @@ class ProductViewSet(ModelViewSet):
 
 
 class PurchaseViewSet(ModelViewSet):
-    queryset = PurchaseOrder.objects.all()
+    queryset = PurchaseOrder.objects.all().select_related('product','supplier')
     serializer_class = PurchaseOrderSerializer
     pagination_class = PageNumberPagination
     permission_classes = [IsAuthenticated,IsManager]
@@ -112,22 +117,28 @@ class PurchaseViewSet(ModelViewSet):
                 {"detail": f"Purchase is already {purchase.status}."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        purchase.status = "Completed"
-        purchase.save()
-        StockTransaction.objects.create(
-            transaction_type='IN',
-            quantity=purchase.quantity,
-            unit_price=purchase.unit_price,
-            product=purchase.product,
-            created_by=self.request.user,
-            note=f"Purchase Completed with id:{purchase.id}"
-        )
+        try:
+            with transaction.atomic():
+                purchase.status = "Completed"
+                purchase.save()
+                StockTransaction.objects.create(
+                    transaction_type='IN',
+                    quantity=purchase.quantity,
+                    unit_price=purchase.unit_price,
+                    product=purchase.product,
+                    created_by=self.request.user,
+                    note=f"Purchase Completed with id:{purchase.id}"
+                )
+        except Exception as e:
+            logger.error("Purchase failed | purchase_id=%s | user=%s | error=%s | elapsed=%.3fs", pk, self.request.user, e, time.time() - start)
+            return Response({'detail': 'Something went wrong!'}, status=status.HTTP_400_BAD_REQUEST)
+
         logger.info("Purchase completed | purchase_id=%s | product=%s | qty=%s | elapsed=%.3fs", pk, purchase.product.name, purchase.quantity, time.time() - start)
         return Response({'detail': 'Purchase Completed!'})
 
 
 class SaleViewSet(ModelViewSet):
-    queryset = Sale.objects.all()
+    queryset = Sale.objects.all().select_related('product','sold_by')
     serializer_class = SaleSerializer
     pagination_class = PageNumberPagination
     permission_classes = [IsAuthenticated,IsManagerOrOwner]
@@ -138,7 +149,7 @@ class SaleViewSet(ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         if self.request.user.is_staff or self.request.user.groups.filter(name=MANAGER_GROUP).exists():
-            queryset = Sale.objects.all()
+            queryset = queryset
         else:
             queryset = queryset.filter(sold_by=self.request.user)
         return queryset
@@ -158,17 +169,23 @@ class SaleViewSet(ModelViewSet):
                 {"detail": f"Sales is already {sales.status}."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        sales.status = "Completed"
-        sales.save()
-        StockTransaction.objects.create(
-            transaction_type='OUT',
-            quantity=sales.quantity,
-            unit_price=sales.selling_price,
-            product=sales.product,
-            created_by=self.request.user,
-            note=f"Sales Completed with id:{sales.id}"
-        )
-        logger.info("Sale completed | sale_id=%s | product=%s | qty=%s | elapsed=%.3fs", pk, sales.product.name, sales.quantity, time.time() - start)
+        try:
+            with transaction.atomic():
+                sales.status = "Completed"
+                sales.save()
+                StockTransaction.objects.create(
+                    transaction_type='OUT',
+                    quantity=sales.quantity,
+                    unit_price=sales.selling_price,
+                    product=sales.product,
+                    created_by=self.request.user,
+                    note=f"Sales Completed with id:{sales.id}"
+                )
+                logger.info("Sale completed | sale_id=%s | product=%s | qty=%s | elapsed=%.3fs", pk, sales.product.name, sales.quantity, time.time() - start)
+        except Exception as e:
+            logger.error("Sale failed | sale_id=%s | user=%s | error=%s | elapsed=%.3fs", pk, self.request.user, e, time.time() - start)
+            return Response({'detail': 'Something went wrong!'}, status=status.HTTP_400_BAD_REQUEST)
+
         if sales.product.current_stock <= sales.product.reorder_level:
             recipients = list(User.objects.filter(is_staff=True).values_list('email', flat=True))
             managers = list(User.objects.filter(groups__name='Manager').values_list('email', flat=True))
@@ -181,7 +198,7 @@ class SaleViewSet(ModelViewSet):
 
 
 class StockTransactionListView(ListAPIView):
-    queryset = StockTransaction.objects.all()
+    queryset = StockTransaction.objects.all().select_related('product__supplier', 'created_by')
     serializer_class = StockTransactionSerializer
     pagination_class = PageNumberPagination
     permission_classes = [IsManagerOrTransactionOwner]

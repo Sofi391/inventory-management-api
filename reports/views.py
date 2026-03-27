@@ -1,6 +1,6 @@
 import logging
 import time
-from datetime import timedelta
+from datetime import timedelta, datetime, time as dt_time
 from django.db.models.functions import TruncDay,TruncWeek,TruncMonth,TruncYear
 from rest_framework import status
 from rest_framework.views import APIView
@@ -11,6 +11,8 @@ from task_api.models import Sale,PurchaseOrder,Product
 from django.utils import timezone
 from django.db.models import Q, F, Sum, Avg, Count, Max, Min, ExpressionWrapper, DecimalField
 from django.db import DatabaseError
+from decimal import Decimal
+from datetime import date
 
 logger = logging.getLogger('reports')
 
@@ -21,12 +23,17 @@ VALID_GROUP_BY = {'day', 'week', 'month', 'year'}
 
 def validate_date_params(from_date, to_date):
     """Raises ValueError if date params are provided but in wrong format."""
-    from datetime import datetime
-    fmt = '%Y-%m-%d'
     if from_date:
-        datetime.strptime(from_date, fmt)
+        date.fromisoformat(from_date)
     if to_date:
-        datetime.strptime(to_date, fmt)
+        date.fromisoformat(to_date)
+
+
+def date_to_datetime_range(from_date, to_date):
+    """Convert date strings to timezone-aware datetime boundaries for index-friendly filtering."""
+    from_dt = timezone.make_aware(datetime.combine(date.fromisoformat(from_date), dt_time.min)) if from_date else None
+    to_dt = timezone.make_aware(datetime.combine(date.fromisoformat(to_date), dt_time.max)) if to_date else None
+    return from_dt, to_dt
 
 
 class SalesReportView(APIView):
@@ -41,12 +48,13 @@ class SalesReportView(APIView):
 
         try:
             validate_date_params(from_date, to_date)
+            from_dt, to_dt = date_to_datetime_range(from_date, to_date)
 
             sales = Sale.objects.filter(status='Completed')
-            if from_date:
-                sales = sales.filter(created_at__date__gte=from_date)
-            if to_date:
-                sales = sales.filter(created_at__date__lte=to_date)
+            if from_dt:
+                sales = sales.filter(created_at__gte=from_dt)
+            if to_dt:
+                sales = sales.filter(created_at__lte=to_dt)
 
             revenue_expression = ExpressionWrapper(
                 F('quantity')*F('selling_price'),
@@ -60,10 +68,6 @@ class SalesReportView(APIView):
             )
 
             response = {
-                'period': {
-                    'from': from_date,
-                    'to': to_date,
-                },
                 'summary': {
                     'total_quantity': sales_summary['total_quantity'],
                     'total_sales_revenue': sales_summary['total_revenue'],
@@ -85,6 +89,12 @@ class SalesReportView(APIView):
                     'total_sales': personal_summary['total_sales'],
                 }
 
+            response['metadata'] = {
+                'generated_at': timezone.now(),
+                'from': from_date,
+                'to': to_date,
+                'sales_person': sales_person if sales_person else 'All',
+            }
             logger.info("Sales report generated | user=%s | elapsed=%.3fs", request.user, time.time() - start)
             return Response(response, status=status.HTTP_200_OK)
 
@@ -110,12 +120,13 @@ class PurchaseReportView(APIView):
 
         try:
             validate_date_params(from_date, to_date)
+            from_dt, to_dt = date_to_datetime_range(from_date, to_date)
 
             purchase = PurchaseOrder.objects.filter(status='Completed')
-            if from_date:
-                purchase = purchase.filter(created_at__date__gte=from_date)
-            if to_date:
-                purchase = purchase.filter(created_at__date__lte=to_date)
+            if from_dt:
+                purchase = purchase.filter(created_at__gte=from_dt)
+            if to_dt:
+                purchase = purchase.filter(created_at__lte=to_dt)
 
             cost_expression = ExpressionWrapper(
                 F('quantity')*F('unit_price'),
@@ -130,7 +141,8 @@ class PurchaseReportView(APIView):
 
             logger.info("Purchase report generated | user=%s | elapsed=%.3fs", request.user, time.time() - start)
             return Response({
-                'period': {
+                'metadata': {
+                    'generated_at': timezone.now(),
                     'from': from_date,
                     'to': to_date,
                 },
@@ -164,17 +176,18 @@ class StockReport(APIView):
 
         try:
             validate_date_params(from_date, to_date)
+            from_dt, to_dt = date_to_datetime_range(from_date, to_date)
 
-            products = Product.objects.all()
+            products = Product.objects.select_related('supplier').all()
             if name:
                 products = products.filter(
                     Q(name__icontains=name) |
                     Q(category__icontains=name)
                 )
-            if from_date:
-                products = products.filter(created_at__date__gte=from_date)
-            if to_date:
-                products = products.filter(created_at__date__lte=to_date)
+            if from_dt:
+                products = products.filter(created_at__gte=from_dt)
+            if to_dt:
+                products = products.filter(created_at__lte=to_dt)
 
             inventory_value = ExpressionWrapper(
                 F('current_stock')*F('buying_price'),
@@ -193,6 +206,12 @@ class StockReport(APIView):
 
             logger.info("Stock report generated | user=%s | elapsed=%.3fs", request.user, time.time() - start)
             return Response({
+                'metadata': {
+                    'generated_at': timezone.now(),
+                    'from': from_date,
+                    'to': to_date,
+                    'filter_name': name if name else 'All',
+                },
                 'summary': StockReportSummarySerializer(in_stock).data,
                 'stock_products': ProductReportSerializer(stock_products, many=True).data,
                 'low_stock_products': ProductReportSerializer(low_stock, many=True).data,
@@ -222,42 +241,51 @@ class ProfitReport(APIView):
 
         try:
             validate_date_params(from_date, to_date)
+            from_dt, to_dt = date_to_datetime_range(from_date, to_date)
 
             total_sales = Sale.objects.filter(status='Completed')
             total_purchase = PurchaseOrder.objects.filter(status='Completed')
 
-            if from_date:
-                total_sales = total_sales.filter(created_at__date__gte=from_date)
-                total_purchase = total_purchase.filter(created_at__date__gte=from_date)
-            if to_date:
-                total_sales = total_sales.filter(created_at__date__lte=to_date)
-                total_purchase = total_purchase.filter(created_at__date__lte=to_date)
+            if from_dt:
+                total_sales = total_sales.filter(created_at__gte=from_dt)
+                total_purchase = total_purchase.filter(created_at__gte=from_dt)
+            if to_dt:
+                total_sales = total_sales.filter(created_at__lte=to_dt)
+                total_purchase = total_purchase.filter(created_at__lte=to_dt)
             if product:
                 total_sales = total_sales.filter(product__name__icontains=product)
                 total_purchase = total_purchase.filter(product__name__icontains=product)
 
             total_cost_calc = ExpressionWrapper(
-                F('quantity')*F('unit_price'),
+                F('quantity')*F('product__buying_price'),
                 output_field=DecimalField(max_digits=15, decimal_places=2)
             )
             total_revenue_calc = ExpressionWrapper(
                 F('quantity')*F('selling_price'),
                 output_field=DecimalField(max_digits=15, decimal_places=2)
             )
+            total_purchase_calc = ExpressionWrapper(
+                F('quantity')*F('unit_price'),
+                output_field=DecimalField(max_digits=15, decimal_places=2)
+            )
 
-            total_cost = total_purchase.aggregate(
-                total_cost=Sum(total_cost_calc,default=0),
+            total_purchases = total_purchase.aggregate(
+                total_purchases=Sum(total_purchase_calc,default=0),
                 purchase_count=Count('id'),
                 total_quantity=Sum('quantity',default=0),
             )
             total_revenue = total_sales.aggregate(
                 total_revenue=Sum(total_revenue_calc,default=0),
+                total_cost=Sum(total_cost_calc,default=0),
                 sales_count=Count('id'),
                 total_quantity=Sum('quantity', default=0),
             )
 
-            profit = total_revenue['total_revenue'] - total_cost['total_cost']
-            profit_margin = round((profit / total_revenue['total_revenue'] * 100), 2) if total_revenue['total_revenue'] > 0 else 0
+            profit = total_revenue['total_revenue'] - total_revenue['total_cost']
+            profit_margin = ((profit / total_revenue['total_revenue'] * 100).quantize(Decimal('.01'))
+                if total_revenue['total_revenue'] > 0
+                 else Decimal('0.00')
+                             )
 
             logger.info("Profit report generated | user=%s | profit=%s | elapsed=%.3fs", request.user, profit, time.time() - start)
             return Response({
@@ -268,18 +296,19 @@ class ProfitReport(APIView):
                     'filter_product': product if product else "All Products",
                 },
                 'summary': {
-                    'total_cost': total_cost['total_cost'],
+                    'total_cost': total_revenue['total_cost'],
                     'total_revenue': total_revenue['total_revenue'],
-                    'net_profit': profit,
+                    'total_purchase':total_purchases['total_purchases'],
+                    'gross_profit': profit,
                     'profit_margin': profit_margin,
                 },
                 'volume': {
                     'sales_count': total_revenue['sales_count'],
-                    'purchases_count': total_cost['purchase_count'],
+                    'purchases_count': total_purchases['purchase_count'],
                 },
                 'quantity': {
                     'sold_quantity': total_revenue['total_quantity'],
-                    'purchased_quantity': total_cost['total_quantity'],
+                    'purchased_quantity': total_purchases['total_quantity'],
                 }
             }, status=status.HTTP_200_OK)
 
@@ -323,6 +352,7 @@ class TopSellingProducts(APIView):
                 return Response({'detail': f"Invalid time value. Choose from: {', '.join(VALID_TIME_FRAMES)}."}, status=status.HTTP_400_BAD_REQUEST)
 
             validate_date_params(from_date, to_date)
+            from_dt, to_dt = date_to_datetime_range(from_date, to_date)
 
             now = timezone.now()
             sort_mapping = {
@@ -342,19 +372,20 @@ class TopSellingProducts(APIView):
             filter_time = time_mapping.get(time_frame)
             if not (from_date or to_date) and filter_time:
                 sells = sells.filter(created_at__gte=filter_time)
-            if from_date:
-                sells = sells.filter(created_at__date__gte=from_date)
-            if to_date:
-                sells = sells.filter(created_at__date__lte=to_date)
+            if from_dt:
+                sells = sells.filter(created_at__gte=from_dt)
+            if to_dt:
+                sells = sells.filter(created_at__lte=to_dt)
 
             total_revenue_calc = ExpressionWrapper(
                 F('quantity') * F('selling_price'),
                 output_field=DecimalField(max_digits=15, decimal_places=2)
             )
 
-            total_sells = sells.values('product', 'product__name').annotate(
-                product_id=F('product_id'),
-                product_name=F('product__name'),
+            total_sells = sells.values(
+                prod_id=F('product'),
+                product_name=F('product__name')
+            ).annotate(
                 total_sells=Sum('quantity', default=0),
                 total_revenue=Sum(total_revenue_calc, default=0),
                 total_sells_transactions=Count('id'),
@@ -411,6 +442,7 @@ class TopSellingPersonsView(APIView):
                 return Response({'detail': f"Invalid time value. Choose from: {', '.join(VALID_TIME_FRAMES)}."}, status=status.HTTP_400_BAD_REQUEST)
 
             validate_date_params(from_date, to_date)
+            from_dt, to_dt = date_to_datetime_range(from_date, to_date)
 
             now = timezone.now()
             sort_mapping = {
@@ -430,19 +462,20 @@ class TopSellingPersonsView(APIView):
             filter_time = time_mapping.get(time_frame)
             if not (from_date or to_date) and filter_time:
                 sells = sells.filter(created_at__gte=filter_time)
-            if from_date:
-                sells = sells.filter(created_at__date__gte=from_date)
-            if to_date:
-                sells = sells.filter(created_at__date__lte=to_date)
+            if from_dt:
+                sells = sells.filter(created_at__gte=from_dt)
+            if to_dt:
+                sells = sells.filter(created_at__lte=to_dt)
 
             total_revenue_calc = ExpressionWrapper(
                 F('quantity') * F('selling_price'),
                 output_field=DecimalField(max_digits=15, decimal_places=2)
             )
 
-            total_sells = sells.values('sold_by', 'sold_by__username').annotate(
+            total_sells = sells.values(
                 sells_person_id=F('sold_by'),
-                sells_person_name=F('sold_by__username'),
+                sells_person_name=F('sold_by__username')
+            ).annotate(
                 total_sells=Sum('quantity', default=0),
                 total_revenue=Sum(total_revenue_calc, default=0),
                 total_sells_transactions=Count('id'),
@@ -487,6 +520,7 @@ class SummaryReports(APIView):
                 return Response({'detail': f"Invalid group_by value. Choose from: {', '.join(VALID_GROUP_BY)}."}, status=status.HTTP_400_BAD_REQUEST)
 
             validate_date_params(from_date, to_date)
+            from_dt, to_dt = date_to_datetime_range(from_date, to_date)
 
             trunc_map = {
                 'day': TruncDay,
@@ -496,42 +530,38 @@ class SummaryReports(APIView):
             }
 
             total_revenue_calc = ExpressionWrapper(
-                F('quantity') * F('selling_price'),
+                F('quantity') * F('product__selling_price'),
                 output_field=DecimalField(max_digits=15, decimal_places=2)
             )
-            total_purchase_calc = ExpressionWrapper(
-                F('quantity') * F('unit_price'),
+            total_cost_calc = ExpressionWrapper(
+                F('quantity') * F('product__buying_price'),
                 output_field=DecimalField(max_digits=15, decimal_places=2)
             )
 
             sales = Sale.objects.filter(status='Completed')
-            purchases = PurchaseOrder.objects.filter(status='Completed')
-            if from_date:
-                sales = sales.filter(created_at__date__gte=from_date)
-                purchases = purchases.filter(created_at__date__gte=from_date)
-            if to_date:
-                sales = sales.filter(created_at__date__lte=to_date)
-                purchases = purchases.filter(created_at__date__lte=to_date)
+            if from_dt:
+                sales = sales.filter(created_at__gte=from_dt)
+            if to_dt:
+                sales = sales.filter(created_at__lte=to_dt)
 
             sales_summary = sales.aggregate(
                 total_sales=Sum('quantity', default=0),
                 total_revenue=Sum(total_revenue_calc, default=0),
+                total_cost=Sum(total_cost_calc, default=0),
                 total_sales_transactions=Count('id'),
             )
-            purchases_summary = purchases.aggregate(
-                total_purchases=Sum('quantity', default=0),
-                total_cost=Sum(total_purchase_calc, default=0),
-                total_purchase_transactions=Count('id'),
-            )
 
-            profit = sales_summary['total_revenue'] - purchases_summary['total_cost']
-            profit_margin = round((profit / sales_summary['total_revenue'] * 100), 2) if sales_summary['total_revenue'] > 0 else 0
-
+            profit = sales_summary['total_revenue'] - sales_summary['total_cost']
+            profit_margin = ((profit / sales_summary['total_revenue'] * 100).quantize(Decimal('0.01'))
+                if sales_summary['total_revenue'] > 0
+                else Decimal('0.00')
+                             )
             sales_list = sales.annotate(
                 time_period=trunc_map[group_by]('created_at')
             ).values('time_period').annotate(
                 total_sales=Sum('quantity', default=0),
                 total_revenue=Sum(total_revenue_calc, default=0),
+                total_profit=Sum(total_revenue_calc - total_cost_calc, default=0),
                 total_sales_transactions=Count('id'),
             ).order_by('-time_period')
 
@@ -547,7 +577,7 @@ class SummaryReports(APIView):
                     'total_sales': sales_summary['total_sales'],
                     'total_revenue': sales_summary['total_revenue'],
                     'total_sales_transactions': sales_summary['total_sales_transactions'],
-                    'net_profit': profit,
+                    'gross_profit': profit,
                     'profit_margin': profit_margin,
                 },
                 'timeline': SummaryTimelineSerializer(sales_list, many=True).data,

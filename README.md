@@ -4,6 +4,7 @@
 [![Django](https://img.shields.io/badge/Django-5.x-green)](https://www.djangoproject.com/)
 [![DRF](https://img.shields.io/badge/DRF-Django%20REST%20Framework-red)](https://www.django-rest-framework.org/)
 [![Pytest](https://img.shields.io/badge/Tested%20with-pytest-0a9edc?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![CI](https://github.com/Sofi391/Task_management_api_capstone/actions/workflows/django-ci.yml/badge.svg)](https://github.com/Sofi391/Task_management_api_capstone/actions/workflows/django-ci.yml)
 [![Swagger](https://img.shields.io/badge/Swagger-UI-85EA2D?logo=swagger&logoColor=black)](https://task-management-api-ft4y.onrender.com/api/docs/)
 [![ReDoc](https://img.shields.io/badge/ReDoc-Docs-8A2BE2?logo=readthedocs&logoColor=white)](https://task-management-api-ft4y.onrender.com/api/redoc/)
@@ -142,6 +143,7 @@ pytest
 - **PostgreSQL / MySQL**
 - Django ORM (advanced annotations & aggregations)
 - **pytest** & pytest-django for testing
+- **Docker** & Docker Compose for containerization
 - **GitHub Actions** for CI/CD
 - Git & GitHub for version control
 
@@ -200,6 +202,47 @@ pip install -r requirements.txt
 
 python manage.py migrate
 python manage.py runserver
+```
+
+---
+
+## 🐳 Run with Docker
+
+The project is fully containerized using **Docker** and **Docker Compose**. The setup spins up two services:
+
+- `db` — PostgreSQL 15 database with a persistent volume and a health check
+- `web` — Django app that waits for the database to be healthy, runs migrations, then starts Gunicorn
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/) installed
+- A `.env` file in the project root. Copy the provided example and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Then open `.env` and replace the placeholder values with your actual configuration. See [`.env.example`](.env.example) for all required variables.
+
+### Start the project
+
+```bash
+docker compose up --build
+```
+
+The API will be available at `http://localhost:8000`.
+
+### Other useful commands
+
+```bash
+# Run in detached mode
+docker compose up --build -d
+
+# Stop containers
+docker compose down
+
+# Stop and remove volumes (wipes the database)
+docker compose down -v
 ```
 
 ---

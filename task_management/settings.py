@@ -82,7 +82,7 @@ else:
             'HOST': os.getenv('DB_HOST'),
             'PORT': os.getenv('DB_PORT', '5432'),
             'OPTIONS': {
-                'sslmode': 'require',
+                'sslmode': 'require' if not os.getenv('GITHUB_ACTIONS') else 'disable',
             },
         }
     }

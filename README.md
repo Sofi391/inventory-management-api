@@ -4,6 +4,7 @@
 [![Django](https://img.shields.io/badge/Django-5.x-green)](https://www.djangoproject.com/)
 [![DRF](https://img.shields.io/badge/DRF-Django%20REST%20Framework-red)](https://www.django-rest-framework.org/)
 [![Pytest](https://img.shields.io/badge/Tested%20with-pytest-0a9edc?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![CI](https://github.com/Sofi391/Task_management_api_capstone/actions/workflows/django-ci.yml/badge.svg)](https://github.com/Sofi391/Task_management_api_capstone/actions/workflows/django-ci.yml)
 
 A **production-ready Inventory Management REST API** built with Django and Django REST Framework.  
 The system provides **secure authentication**, **inventory & stock control**, and **advanced business analytics and reporting** for small to medium-sized businesses.
@@ -114,7 +115,14 @@ The project includes a comprehensive **pytest** test suite covering all API endp
 | Reports | `test_top_selling_report.py` | Access control, sorting, time frames, limit, date filtering |
 | Reports | `test_summary_report.py` | Access control, summary correctness, group_by, timeline, date filtering |
 
-### Run the Tests
+### Continuous Integration
+
+All tests are automatically run on every push and pull request to `master` / `main` via **GitHub Actions**.  
+The CI pipeline spins up a PostgreSQL service, runs migrations, and executes the full pytest suite.
+
+Workflow file: [`.github/workflows/django-ci.yml`](.github/workflows/django-ci.yml)
+
+### Run the Tests Locally
 
 ```bash
 pip install pytest pytest-django
@@ -132,6 +140,7 @@ pytest
 - **PostgreSQL / MySQL**
 - Django ORM (advanced annotations & aggregations)
 - **pytest** & pytest-django for testing
+- **GitHub Actions** for CI/CD
 - Git & GitHub for version control
 
 ---
@@ -199,6 +208,7 @@ Through building this project, I gained practical experience in:
 - Structuring and maintaining large Django projects cleanly
 - Implementing inventory, sales, and stock management workflows
 - Integrating email notifications and OTP verification systems
+- Setting up a **CI pipeline with GitHub Actions** — configuring a PostgreSQL service container, managing secrets, and automating the full test suite on every push was a rewarding challenge that reinforced the importance of automated testing in real-world projects
 
 ---
 

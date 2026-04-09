@@ -5,6 +5,8 @@
 [![DRF](https://img.shields.io/badge/DRF-Django%20REST%20Framework-red)](https://www.django-rest-framework.org/)
 [![Pytest](https://img.shields.io/badge/Tested%20with-pytest-0a9edc?logo=pytest&logoColor=white)](https://docs.pytest.org/)
 [![CI](https://github.com/Sofi391/Task_management_api_capstone/actions/workflows/django-ci.yml/badge.svg)](https://github.com/Sofi391/Task_management_api_capstone/actions/workflows/django-ci.yml)
+[![Swagger](https://img.shields.io/badge/Swagger-UI-85EA2D?logo=swagger&logoColor=black)](https://task-management-api-ft4y.onrender.com/api/docs/)
+[![ReDoc](https://img.shields.io/badge/ReDoc-Docs-8A2BE2?logo=readthedocs&logoColor=white)](https://task-management-api-ft4y.onrender.com/api/redoc/)
 
 A **production-ready Inventory Management REST API** built with Django and Django REST Framework.  
 The system provides **secure authentication**, **inventory & stock control**, and **advanced business analytics and reporting** for small to medium-sized businesses.
@@ -164,14 +166,21 @@ This separation ensures **scalability**, **maintainability**, and clean responsi
 
 ## 🚀 API Documentation
 
-📮 **Postman Collection:**  
-**API Documentation / Postman Collection:** [Click Here](https://documenter.getpostman.com/view/48400327/2sBXVbGYdx)
+The API is fully documented using **drf-spectacular** and is available in two interactive formats:
 
-The API is fully documented via Postman, covering:
-- Authentication flows
-- CRUD operations
-- Reporting and analytics endpoints
-- Query parameters and filters
+| Format | URL | Description |
+|---|---|---|
+| [![Swagger](https://img.shields.io/badge/Swagger-UI-85EA2D?logo=swagger&logoColor=black)](https://task-management-api-ft4y.onrender.com/api/docs/) | `/api/docs/` | Interactive Swagger UI — try out endpoints directly from the browser |
+| [![ReDoc](https://img.shields.io/badge/ReDoc-Docs-8A2BE2?logo=readthedocs&logoColor=white)](https://task-management-api-ft4y.onrender.com/api/redoc/) | `/api/redoc/` | Clean ReDoc reference documentation |
+| 📄 Raw Schema | `/api/schema/` | OpenAPI 3.0 schema in YAML format |
+
+All endpoints are annotated with `@extend_schema` covering:
+- Request and response schemas
+- Query parameter descriptions
+- HTTP status codes and error responses
+- Grouped by tag: Authentication, Products, Suppliers, Purchases, Sales, Stock Transactions, Reports
+
+📮 **Postman Collection:** [Click Here](https://documenter.getpostman.com/view/48400327/2sBXVbGYdx)
 
 ---
 
@@ -220,7 +229,6 @@ Planned enhancements to further improve scalability and usability:
 - Redis-based caching for heavy reports
 - Asynchronous email, OTP, and report generation using Celery
 - CSV / Excel export for reports
-- API documentation with Swagger / OpenAPI
 - React-based frontend dashboard
 - Role-based UI views
 - Graph and chart visualizations

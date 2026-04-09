@@ -3,6 +3,7 @@ import time
 from rest_framework.generics import ListAPIView, CreateAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
 from .permissions import IsManagerOrReadOnly,IsManager,IsManagerOrOwner,IsManagerOrTransactionOwner
 from .permissions import MANAGER_GROUP, _is_manager
 from django.utils import timezone
@@ -56,6 +57,7 @@ The Inventory Management Team
     logger.info("Low stock alert sent | product=%s | stock=%s | recipients=%s", product.name, product.current_stock, recipients)
 
 
+@extend_schema(tags=['Suppliers'])
 class SupplierViewSet(ModelViewSet):
     queryset = Supplier.objects.all().prefetch_related('products')
     serializer_class = SupplierSerializer
@@ -78,6 +80,7 @@ class SupplierViewSet(ModelViewSet):
         return queryset.distinct()
 
 
+@extend_schema(tags=['Products'])
 class ProductViewSet(ModelViewSet):
     queryset = Product.objects.all().select_related('supplier')
     serializer_class = ProductSerializer
@@ -97,6 +100,7 @@ class ProductViewSet(ModelViewSet):
         return queryset
 
 
+@extend_schema(tags=['Purchases'])
 class PurchaseViewSet(ModelViewSet):
     queryset = PurchaseOrder.objects.all().select_related('product','supplier')
     serializer_class = PurchaseOrderSerializer
@@ -106,6 +110,14 @@ class PurchaseViewSet(ModelViewSet):
     filter_backends = (filters.SearchFilter,)
     search_fields = ('product__name','product__category')
 
+    @extend_schema(
+        summary='Complete a purchase order',
+        description='Marks a pending purchase order as Completed and creates an IN stock transaction to update inventory.',
+        responses={
+            200: OpenApiResponse(description='Purchase completed successfully.'),
+            400: OpenApiResponse(description='Purchase is already completed or a transaction error occurred.'),
+        },
+    )
     @action(detail=True,methods=['post'],permission_classes=[IsAuthenticated,IsManager])
     def complete(self, request, pk=None):
         start = time.time()
@@ -137,6 +149,7 @@ class PurchaseViewSet(ModelViewSet):
         return Response({'detail': 'Purchase Completed!'})
 
 
+@extend_schema(tags=['Sales'])
 class SaleViewSet(ModelViewSet):
     queryset = Sale.objects.all().select_related('product','sold_by')
     serializer_class = SaleSerializer
@@ -158,6 +171,14 @@ class SaleViewSet(ModelViewSet):
         product = serializer.validated_data['product']
         serializer.save(sold_by=self.request.user,selling_price=product.selling_price)
 
+    @extend_schema(
+        summary='Complete a sale',
+        description='Marks a pending sale as Completed, deducts stock, creates an OUT stock transaction, and triggers a low-stock alert if needed.',
+        responses={
+            200: OpenApiResponse(description='Sale completed successfully.'),
+            400: OpenApiResponse(description='Sale is already completed or insufficient stock.'),
+        },
+    )
     @action(detail=True,methods=['post'])
     def complete(self, request, pk=None):
         start = time.time()
@@ -197,6 +218,14 @@ class SaleViewSet(ModelViewSet):
         return Response({'detail': 'Sales Completed!'})
 
 
+@extend_schema(
+    tags=['Stock Transactions'],
+    summary='List stock transactions',
+    description='Returns a paginated list of stock transactions. Managers see all transactions; staff see only their own. Supports filtering by ?type=IN or ?type=OUT.',
+    parameters=[
+        OpenApiParameter(name='type', description='Filter by transaction type: IN or OUT.', required=False, type=str),
+    ],
+)
 class StockTransactionListView(ListAPIView):
     queryset = StockTransaction.objects.all().select_related('product__supplier', 'created_by')
     serializer_class = StockTransactionSerializer
@@ -221,6 +250,17 @@ class StockTransactionListView(ListAPIView):
         return queryset
 
 
+@extend_schema(
+    tags=['Stock Transactions'],
+    summary='Create a manual stock transaction',
+    description='Allows managers to manually create an IN or OUT stock transaction (e.g. gifted stock, defective write-offs). Triggers a low-stock alert if stock drops to reorder level.',
+    request=StockTransactionCreateSerializer,
+    responses={
+        201: OpenApiResponse(description='Transaction created successfully.'),
+        400: OpenApiResponse(description='Insufficient stock or validation error.'),
+        403: OpenApiResponse(description='Only managers can create manual transactions.'),
+    },
+)
 class StockTransactionCreate(CreateAPIView):
     queryset = StockTransaction.objects.all()
     serializer_class = StockTransactionCreateSerializer

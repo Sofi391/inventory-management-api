@@ -28,6 +28,9 @@ INSTALLED_APPS = [
 
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
+
+    'drf_spectacular',
+    'drf_spectacular_sidecar',
 ]
 
 MIDDLEWARE = [
@@ -120,6 +123,24 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
             'rest_framework.permissions.IsAuthenticated',
         ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Inventory Management System API',
+    'DESCRIPTION': (
+        'A production-ready Inventory Management REST API built with Django and Django REST Framework. '
+        'Provides secure authentication, inventory & stock control, and advanced business analytics and reporting.'
+    ),
+    'VERSION': '1.0.0',
+    'CONTACT': {
+        'name': 'Sofi (Sofoniyas)',
+        'url': 'https://github.com/sofi391',
+    },
+    'LICENSE': {'name': 'MIT'},
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
 }
 
 

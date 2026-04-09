@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.mail import send_mail
 from django.conf import settings
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 from .serializers import (SignupSerializer,OtpVerificationSerializer,
                           OtpResendSerializer,LoginSerializer,OtpCodeSerializer,
                           PassResetSerializer,
@@ -36,6 +37,16 @@ def send_otp(otp):
     )
 
 
+@extend_schema(
+    tags=['Authentication'],
+    summary='Register a new user',
+    description='Creates a new user account and sends an OTP to the provided email for verification.',
+    request=SignupSerializer,
+    responses={
+        201: OpenApiResponse(description='OTP sent successfully to the registered email.'),
+        400: OpenApiResponse(description='Validation error — email already exists or invalid data.'),
+    },
+)
 class SignupView(CreateAPIView):
     model = User
     serializer_class = SignupSerializer
@@ -57,6 +68,16 @@ class SignupView(CreateAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    tags=['Authentication'],
+    summary='Verify OTP and activate account',
+    description='Verifies the OTP code sent to the user email. On success, activates the account and returns JWT tokens.',
+    request=OtpVerificationSerializer,
+    responses={
+        200: OpenApiResponse(description='Account verified. Returns access and refresh JWT tokens.'),
+        400: OpenApiResponse(description='Invalid or expired OTP code.'),
+    },
+)
 class VerifyOtpView(APIView):
     permission_classes = (permissions.AllowAny,)
 
@@ -97,6 +118,16 @@ class VerifyOtpView(APIView):
 
 
 
+@extend_schema(
+    tags=['Authentication'],
+    summary='Resend OTP verification code',
+    description='Resends a new OTP code to the email address of an unverified user.',
+    request=OtpResendSerializer,
+    responses={
+        201: OpenApiResponse(description='New OTP sent successfully.'),
+        400: OpenApiResponse(description='Invalid email or user already verified.'),
+    },
+)
 class OtpResendView(APIView):
     permission_classes = (permissions.AllowAny,)
 
@@ -116,6 +147,16 @@ class OtpResendView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    tags=['Authentication'],
+    summary='Login and obtain JWT tokens',
+    description='Authenticates a verified user with email and password. Returns access and refresh JWT tokens on success.',
+    request=LoginSerializer,
+    responses={
+        200: OpenApiResponse(description='Login successful. Returns access and refresh tokens.'),
+        400: OpenApiResponse(description='Invalid credentials or unverified account.'),
+    },
+)
 class LoginView(APIView):
     permission_classes = (permissions.AllowAny,)
 
@@ -136,6 +177,16 @@ class LoginView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    tags=['Authentication'],
+    summary='Logout and blacklist refresh token',
+    description='Blacklists the provided refresh token to invalidate the session. Requires authentication.',
+    request=None,
+    responses={
+        205: OpenApiResponse(description='Successfully logged out.'),
+        400: OpenApiResponse(description='Refresh token missing, invalid, or already blacklisted.'),
+    },
+)
 class LogoutView(APIView):
     def post(self, request, *args, **kwargs):
         start = time.time()
@@ -154,6 +205,16 @@ class LogoutView(APIView):
             return Response({'detail': 'Invalid or Expired Token'}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    tags=['Authentication'],
+    summary='Request OTP for password reset',
+    description='Sends a one-time password (OTP) to the email address for initiating a password reset.',
+    request=OtpCodeSerializer,
+    responses={
+        200: OpenApiResponse(description='OTP sent successfully to the provided email.'),
+        400: OpenApiResponse(description='Email not found or validation error.'),
+    },
+)
 class OtpRequestView(APIView):
     permission_classes = (permissions.AllowAny,)
 
@@ -174,6 +235,16 @@ class OtpRequestView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    tags=['Authentication'],
+    summary='Reset password using OTP',
+    description='Resets the user password after validating the OTP code. Sends a confirmation email on success.',
+    request=PassResetSerializer,
+    responses={
+        200: OpenApiResponse(description='Password reset successfully.'),
+        400: OpenApiResponse(description='Invalid OTP, expired code, or password validation error.'),
+    },
+)
 class PasswordResetView(APIView):
     permission_classes = (permissions.AllowAny,)
 

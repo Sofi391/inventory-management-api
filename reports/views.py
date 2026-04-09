@@ -5,6 +5,7 @@ from django.db.models.functions import TruncDay,TruncWeek,TruncMonth,TruncYear
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
 from .permissions import IsManager
 from .serializers import ProductReportSerializer,StockReportSummarySerializer,TopSellingReportSerializer,TopSellingPerson,SummaryTimelineSerializer
 from task_api.models import Sale,PurchaseOrder,Product
@@ -36,6 +37,21 @@ def date_to_datetime_range(from_date, to_date):
     return from_dt, to_dt
 
 
+@extend_schema(
+    tags=['Reports'],
+    summary='Sales report',
+    description='Returns a summary of completed sales including total quantity, revenue, and transaction count. Optionally filter by date range and/or a specific sales person.',
+    parameters=[
+        OpenApiParameter(name='from', description='Start date filter (YYYY-MM-DD).', required=False, type=str),
+        OpenApiParameter(name='to', description='End date filter (YYYY-MM-DD).', required=False, type=str),
+        OpenApiParameter(name='sales_person', description='Filter by staff username to get their personal sales summary.', required=False, type=str),
+    ],
+    responses={
+        200: OpenApiResponse(description='Sales summary with optional staff breakdown and metadata.'),
+        400: OpenApiResponse(description='Invalid date format.'),
+        403: OpenApiResponse(description='Manager access only.'),
+    },
+)
 class SalesReportView(APIView):
     permission_classes = (IsManager,)
 
@@ -109,6 +125,20 @@ class SalesReportView(APIView):
             return Response({'detail': 'An unexpected error occurred while generating the sales report.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=['Reports'],
+    summary='Purchase report',
+    description='Returns a summary of completed purchase orders including total quantity, cost, and purchase count. Supports date range filtering.',
+    parameters=[
+        OpenApiParameter(name='from', description='Start date filter (YYYY-MM-DD).', required=False, type=str),
+        OpenApiParameter(name='to', description='End date filter (YYYY-MM-DD).', required=False, type=str),
+    ],
+    responses={
+        200: OpenApiResponse(description='Purchase summary with metadata.'),
+        400: OpenApiResponse(description='Invalid date format.'),
+        403: OpenApiResponse(description='Manager access only.'),
+    },
+)
 class PurchaseReportView(APIView):
     permission_classes = (IsManager,)
 
@@ -164,6 +194,21 @@ class PurchaseReportView(APIView):
             return Response({'detail': 'An unexpected error occurred while generating the purchase report.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=['Reports'],
+    summary='Stock inventory report',
+    description='Returns a full inventory snapshot including in-stock, low-stock, and out-of-stock products with total inventory value. Supports filtering by product name or category and date range.',
+    parameters=[
+        OpenApiParameter(name='name', description='Filter by product name or category (case-insensitive).', required=False, type=str),
+        OpenApiParameter(name='from', description='Start date filter (YYYY-MM-DD).', required=False, type=str),
+        OpenApiParameter(name='to', description='End date filter (YYYY-MM-DD).', required=False, type=str),
+    ],
+    responses={
+        200: OpenApiResponse(description='Inventory summary with stock, low-stock, and out-of-stock product lists.'),
+        400: OpenApiResponse(description='Invalid date format.'),
+        403: OpenApiResponse(description='Manager access only.'),
+    },
+)
 class StockReport(APIView):
     permission_classes = (IsManager,)
 
@@ -229,6 +274,21 @@ class StockReport(APIView):
             return Response({'detail': 'An unexpected error occurred while generating the stock report.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=['Reports'],
+    summary='Profit report',
+    description='Returns revenue, cost of goods sold, gross profit, and profit margin for completed sales. Supports date range and product name filtering.',
+    parameters=[
+        OpenApiParameter(name='from', description='Start date filter (YYYY-MM-DD).', required=False, type=str),
+        OpenApiParameter(name='to', description='End date filter (YYYY-MM-DD).', required=False, type=str),
+        OpenApiParameter(name='product', description='Filter by product name (case-insensitive partial match).', required=False, type=str),
+    ],
+    responses={
+        200: OpenApiResponse(description='Profit summary with revenue, cost, gross profit, margin, and volume breakdown.'),
+        400: OpenApiResponse(description='Invalid date format.'),
+        403: OpenApiResponse(description='Manager access only.'),
+    },
+)
 class ProfitReport(APIView):
     permission_classes = (IsManager,)
 
@@ -323,6 +383,23 @@ class ProfitReport(APIView):
             return Response({'detail': 'An unexpected error occurred while generating the profit report.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=['Reports'],
+    summary='Top selling products',
+    description='Returns the top-selling products ranked by quantity sold, revenue, or transaction count. Supports time frame presets (today, week, month, year, overall), custom date range, and result limit.',
+    parameters=[
+        OpenApiParameter(name='sort_by', description='Sort field: sells (default), revenue, or transactions.', required=False, type=str),
+        OpenApiParameter(name='time', description='Time frame preset: today, week (default), month, year, or overall.', required=False, type=str),
+        OpenApiParameter(name='limit', description='Maximum number of results to return (default: 10).', required=False, type=int),
+        OpenApiParameter(name='from', description='Custom start date filter (YYYY-MM-DD). Overrides time preset.', required=False, type=str),
+        OpenApiParameter(name='to', description='Custom end date filter (YYYY-MM-DD). Overrides time preset.', required=False, type=str),
+    ],
+    responses={
+        200: OpenApiResponse(description='List of top-selling products with sales totals and metadata.'),
+        400: OpenApiResponse(description='Invalid sort_by, time frame, limit, or date format.'),
+        403: OpenApiResponse(description='Manager access only.'),
+    },
+)
 class TopSellingProducts(APIView):
     permission_classes = (IsManager,)
 
@@ -413,6 +490,23 @@ class TopSellingProducts(APIView):
             return Response({'detail': 'An unexpected error occurred while generating the top selling products report.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=['Reports'],
+    summary='Top performing sales staff',
+    description='Returns the top-performing sales staff ranked by quantity sold, revenue, or transaction count. Supports time frame presets, custom date range, and result limit.',
+    parameters=[
+        OpenApiParameter(name='sort_by', description='Sort field: sells (default), revenue, or transactions.', required=False, type=str),
+        OpenApiParameter(name='time', description='Time frame preset: today, week (default), month, year, or overall.', required=False, type=str),
+        OpenApiParameter(name='limit', description='Maximum number of results to return (default: 10).', required=False, type=int),
+        OpenApiParameter(name='from', description='Custom start date filter (YYYY-MM-DD). Overrides time preset.', required=False, type=str),
+        OpenApiParameter(name='to', description='Custom end date filter (YYYY-MM-DD). Overrides time preset.', required=False, type=str),
+    ],
+    responses={
+        200: OpenApiResponse(description='List of top sellers with sales totals and metadata.'),
+        400: OpenApiResponse(description='Invalid sort_by, time frame, limit, or date format.'),
+        403: OpenApiResponse(description='Manager access only.'),
+    },
+)
 class TopSellingPersonsView(APIView):
     permission_classes = (IsManager,)
 
@@ -504,6 +598,21 @@ class TopSellingPersonsView(APIView):
             return Response({'detail': 'An unexpected error occurred while generating the top sellers report.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=['Reports'],
+    summary='Business summary and timeline report',
+    description='Returns an overall business summary (total sales, revenue, profit, margin) and a timeline breakdown grouped by day, week, month, or year. Supports date range filtering.',
+    parameters=[
+        OpenApiParameter(name='group_by', description='Timeline grouping: day (default), week, month, or year.', required=False, type=str),
+        OpenApiParameter(name='from', description='Start date filter (YYYY-MM-DD).', required=False, type=str),
+        OpenApiParameter(name='to', description='End date filter (YYYY-MM-DD).', required=False, type=str),
+    ],
+    responses={
+        200: OpenApiResponse(description='Business summary with profit metrics and grouped timeline data.'),
+        400: OpenApiResponse(description='Invalid group_by value or date format.'),
+        403: OpenApiResponse(description='Manager access only.'),
+    },
+)
 class SummaryReports(APIView):
     permission_classes = (IsManager,)
 

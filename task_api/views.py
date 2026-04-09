@@ -13,7 +13,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
 from rest_framework.viewsets import ModelViewSet
-from rest_framework import filters, status
+from rest_framework import filters, status, serializers
 from .models import Product, Supplier, PurchaseOrder, StockTransaction,Sale,User
 from .serializers import (ProductSerializer, SupplierSerializer,
                           PurchaseOrderSerializer,StockTransactionSerializer,
@@ -228,15 +228,18 @@ class StockTransactionCreate(CreateAPIView):
 
     def perform_create(self, serializer):
         start = time.time()
-        transaction = serializer.save(created_by=self.request.user)
+        try:
+            tx = serializer.save(created_by=self.request.user)
+        except ValueError as e:
+            raise serializers.ValidationError({"detail": str(e)})
         logger.info("Stock transaction created | type=%s | product=%s | qty=%s | user=%s | elapsed=%.3fs",
-                    transaction.transaction_type, transaction.product.name, transaction.quantity, self.request.user, time.time() - start)
-        if transaction.product.current_stock <= transaction.product.reorder_level:
+                    tx.transaction_type, tx.product.name, tx.quantity, self.request.user, time.time() - start)
+        if tx.product.current_stock <= tx.product.reorder_level:
             recipients = list(User.objects.filter(is_staff=True).values_list('email', flat=True))
             managers = list(User.objects.filter(groups__name='Manager').values_list('email', flat=True))
             recipients = list(set(recipients + managers))
             try:
-                low_stock_alert(transaction.product, recipients)
+                low_stock_alert(tx.product, recipients)
             except Exception as e:
-                logger.error("Failed to send low stock alert | product=%s | error=%s", transaction.product.name, e)
-        return transaction
+                logger.error("Failed to send low stock alert | product=%s | error=%s", tx.product.name, e)
+        return tx

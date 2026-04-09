@@ -7,7 +7,14 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
 from .permissions import IsManager
-from .serializers import ProductReportSerializer,StockReportSummarySerializer,TopSellingReportSerializer,TopSellingPerson,SummaryTimelineSerializer
+from .serializers import (
+    ProductReportSerializer, StockReportSummarySerializer,
+    TopSellingReportSerializer, TopSellingPerson, SummaryTimelineSerializer,
+    SalesReportResponseSerializer, PurchaseReportResponseSerializer,
+    StockReportResponseSerializer, ProfitReportResponseSerializer,
+    TopSellingProductsResponseSerializer, TopSellersResponseSerializer,
+    SummaryReportResponseSerializer,
+)
 from task_api.models import Sale,PurchaseOrder,Product
 from django.utils import timezone
 from django.db.models import Q, F, Sum, Avg, Count, Max, Min, ExpressionWrapper, DecimalField
@@ -47,7 +54,7 @@ def date_to_datetime_range(from_date, to_date):
         OpenApiParameter(name='sales_person', description='Filter by staff username to get their personal sales summary.', required=False, type=str),
     ],
     responses={
-        200: OpenApiResponse(description='Sales summary with optional staff breakdown and metadata.'),
+        200: SalesReportResponseSerializer,
         400: OpenApiResponse(description='Invalid date format.'),
         403: OpenApiResponse(description='Manager access only.'),
     },
@@ -134,7 +141,7 @@ class SalesReportView(APIView):
         OpenApiParameter(name='to', description='End date filter (YYYY-MM-DD).', required=False, type=str),
     ],
     responses={
-        200: OpenApiResponse(description='Purchase summary with metadata.'),
+        200: PurchaseReportResponseSerializer,
         400: OpenApiResponse(description='Invalid date format.'),
         403: OpenApiResponse(description='Manager access only.'),
     },
@@ -204,7 +211,7 @@ class PurchaseReportView(APIView):
         OpenApiParameter(name='to', description='End date filter (YYYY-MM-DD).', required=False, type=str),
     ],
     responses={
-        200: OpenApiResponse(description='Inventory summary with stock, low-stock, and out-of-stock product lists.'),
+        200: StockReportResponseSerializer,
         400: OpenApiResponse(description='Invalid date format.'),
         403: OpenApiResponse(description='Manager access only.'),
     },
@@ -284,7 +291,7 @@ class StockReport(APIView):
         OpenApiParameter(name='product', description='Filter by product name (case-insensitive partial match).', required=False, type=str),
     ],
     responses={
-        200: OpenApiResponse(description='Profit summary with revenue, cost, gross profit, margin, and volume breakdown.'),
+        200: ProfitReportResponseSerializer,
         400: OpenApiResponse(description='Invalid date format.'),
         403: OpenApiResponse(description='Manager access only.'),
     },
@@ -395,7 +402,7 @@ class ProfitReport(APIView):
         OpenApiParameter(name='to', description='Custom end date filter (YYYY-MM-DD). Overrides time preset.', required=False, type=str),
     ],
     responses={
-        200: OpenApiResponse(description='List of top-selling products with sales totals and metadata.'),
+        200: TopSellingProductsResponseSerializer,
         400: OpenApiResponse(description='Invalid sort_by, time frame, limit, or date format.'),
         403: OpenApiResponse(description='Manager access only.'),
     },
@@ -502,7 +509,7 @@ class TopSellingProducts(APIView):
         OpenApiParameter(name='to', description='Custom end date filter (YYYY-MM-DD). Overrides time preset.', required=False, type=str),
     ],
     responses={
-        200: OpenApiResponse(description='List of top sellers with sales totals and metadata.'),
+        200: TopSellersResponseSerializer,
         400: OpenApiResponse(description='Invalid sort_by, time frame, limit, or date format.'),
         403: OpenApiResponse(description='Manager access only.'),
     },
@@ -608,7 +615,7 @@ class TopSellingPersonsView(APIView):
         OpenApiParameter(name='to', description='End date filter (YYYY-MM-DD).', required=False, type=str),
     ],
     responses={
-        200: OpenApiResponse(description='Business summary with profit metrics and grouped timeline data.'),
+        200: SummaryReportResponseSerializer,
         400: OpenApiResponse(description='Invalid group_by value or date format.'),
         403: OpenApiResponse(description='Manager access only.'),
     },

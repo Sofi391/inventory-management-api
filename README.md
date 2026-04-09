@@ -14,6 +14,8 @@
 
 > 🎬 **Video Walkthrough** — Watch the full API demo on [Loom](https://www.loom.com/share/b73eff61a020489a93e32f39d733edb5)
 
+> 📸 **Screenshots Gallery** — Browse all API screenshots in the [Gallery](GALLERY.md)
+
 > 📚 **API Docs** — Interactive docs available at [`/api/docs/`](https://task-management-api-ft4y.onrender.com/api/docs/) or [`/api/redoc/`](https://task-management-api-ft4y.onrender.com/api/redoc/)
 
 > 📮 **Postman Collection** — [Click Here](https://documenter.getpostman.com/view/48400327/2sBXVbGYdx)

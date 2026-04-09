@@ -3,6 +3,7 @@
 [![Python](https://img.shields.io/badge/Python-3.x-blue)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-5.x-green)](https://www.djangoproject.com/)
 [![DRF](https://img.shields.io/badge/DRF-Django%20REST%20Framework-red)](https://www.django-rest-framework.org/)
+[![Pytest](https://img.shields.io/badge/Tested%20with-pytest-0a9edc?logo=pytest&logoColor=white)](https://docs.pytest.org/)
 
 A **production-ready Inventory Management REST API** built with Django and Django REST Framework.  
 The system provides **secure authentication**, **inventory & stock control**, and **advanced business analytics and reporting** for small to medium-sized businesses.
@@ -90,6 +91,38 @@ The goal was to go beyond CRUD and implement **meaningful business reports**, **
 
 ---
 
+## 🧪 Tests
+
+The project includes a comprehensive **pytest** test suite covering all API endpoints across authentication, inventory, and reporting.
+
+### Test Coverage
+
+| Module | Test File | What's Covered |
+|---|---|---|
+| Authentication | `test_signup.py` | Registration, OTP verification, duplicate users |
+| Authentication | `test_login.py` | Login, invalid credentials, JWT token response |
+| Authentication | `test_otp.py` | OTP resend, expiry, verification flow |
+| Authentication | `test_password_reset.py` | OTP-based password reset flow |
+| Inventory | `test_product.py` | CRUD, permissions, search, filtering |
+| Inventory | `test_supplier.py` | CRUD, permissions, slug generation |
+| Inventory | `test_purchase.py` | Create, complete workflow, stock updates |
+| Inventory | `test_sale.py` | Create, complete workflow, stock deduction, atomic rollback |
+| Inventory | `test_transaction.py` | Transaction history, manual IN/OUT, edge cases, low-stock alert |
+| Reports | `test_sales_report.py` | Access control, summary totals, date filtering, staff filter |
+| Reports | `test_purchase_report.py` | Access control, summary totals, date filtering |
+| Reports | `test_profit_report.py` | Access control, revenue/cost/profit/margin correctness, product filter |
+| Reports | `test_top_selling_report.py` | Access control, sorting, time frames, limit, date filtering |
+| Reports | `test_summary_report.py` | Access control, summary correctness, group_by, timeline, date filtering |
+
+### Run the Tests
+
+```bash
+pip install pytest pytest-django
+pytest
+```
+
+---
+
 ## ⚙️ Tech Stack
 
 - **Python 3.x**
@@ -98,6 +131,7 @@ The goal was to go beyond CRUD and implement **meaningful business reports**, **
 - **JWT Authentication**
 - **PostgreSQL / MySQL**
 - Django ORM (advanced annotations & aggregations)
+- **pytest** & pytest-django for testing
 - Git & GitHub for version control
 
 ---

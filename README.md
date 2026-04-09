@@ -29,7 +29,7 @@ This project was designed and implemented as a **capstone-level backend system**
 ## 🔥 Key Highlights
 
 - 🔐 Role-Based Access Control (Manager / Staff)
-- ⚡ 200+ Automated Tests (pytest) — All Passing
+- ⚡ 226+ Automated Tests (pytest) — All Passing
 - 📊 Advanced Reporting System (aggregations, profit tracking, time-based analytics)
 - 🔄 Real-world Inventory Workflow (purchase → stock → sales → transactions)
 - 📉 Low Stock Detection with Email Notifications
@@ -51,6 +51,24 @@ This project was built to simulate a **real-world inventory and sales management
 - Analyze revenue, costs, profit, and trends over time
 
 The goal was to go beyond CRUD and implement **meaningful business reports**, **financial summaries**, and **analytics dashboards** that reflect how real production systems operate.
+
+---
+
+## 🧠 System Design Highlights
+
+- Layered architecture (Views → Services → Models)
+- Atomic transactions for critical operations (sales, purchases)
+- Separation of concerns across apps (accounts, inventory, reports)
+- Optimized ORM queries using `select_related` and `prefetch_related`
+- Idempotent-like behavior in transaction workflows
+
+---
+
+## 🧪 Test Coverage
+
+- 226+ tests passing
+- Covers authentication, inventory workflows, and reporting logic
+- CI pipeline ensures stability on every push
 
 ---
 
